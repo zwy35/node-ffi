@@ -1,7 +1,8 @@
 /* -----------------------------------------------------------------------
-   sysv.S - Copyright (c) 1996, 1998, 2001-2003, 2005, 2008, 2010  Red Hat, Inc.
-   
-   X86 Foreign Function Interface 
+   freebsd.S - Copyright (c) 1996, 1998, 2001, 2002, 2003, 2005  Red Hat, Inc.
+	       Copyright (c) 2008  Björn König
+	
+   X86 Foreign Function Interface for FreeBSD
 
    Permission is hereby granted, free of charge, to any person obtaining
    a copy of this software and associated documentation files (the
@@ -22,7 +23,7 @@
    WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
    DEALINGS IN THE SOFTWARE.
-   ----------------------------------------------------------------------- */
+----------------------------------------------------------------------- */
 
 #ifndef __x86_64__
 
@@ -47,9 +48,6 @@ ffi_call_SYSV:
 	/* Make room for all of the new args.  */
 	movl  16(%ebp),%ecx
 	subl  %ecx,%esp
-
-        /* Align the stack pointer to 16-bytes */
-        andl  $0xfffffff0, %esp
 
 	movl  %esp,%eax
 
@@ -100,6 +98,8 @@ ffi_call_SYSV:
 	.long	retint64-.Lstore_table	/* FFI_TYPE_SINT64 */
 	.long	retstruct-.Lstore_table	/* FFI_TYPE_STRUCT */
 	.long	retint-.Lstore_table	/* FFI_TYPE_POINTER */
+	.long   retstruct1b-.Lstore_table	/* FFI_TYPE_SMALL_STRUCT_1B */
+	.long   retstruct2b-.Lstore_table	/* FFI_TYPE_SMALL_STRUCT_2B */
 
 1:
 	pop  %esi
@@ -148,6 +148,18 @@ retint64:
 	movl  %edx,4(%ecx)
 	jmp   epilogue
 	
+retstruct1b:
+	/* Load %ecx with the pointer to storage for the return value  */
+	movl  24(%ebp),%ecx
+	movb  %al,0(%ecx)
+	jmp   epilogue
+
+retstruct2b:
+	/* Load %ecx with the pointer to storage for the return value  */
+	movl  24(%ebp),%ecx
+	movw  %ax,0(%ecx)
+	jmp   epilogue
+
 retint:
 	/* Load %ecx with the pointer to storage for the return value  */
 	movl  24(%ebp),%ecx	
@@ -214,6 +226,10 @@ ffi_closure_SYSV:
 	je	.Lcls_retldouble
 	cmpl	$FFI_TYPE_SINT64, %eax
 	je	.Lcls_retllong
+	cmpl	$FFI_TYPE_SMALL_STRUCT_1B, %eax
+	je	.Lcls_retstruct1b
+	cmpl	$FFI_TYPE_SMALL_STRUCT_2B, %eax
+	je	.Lcls_retstruct2b
 	cmpl	$FFI_TYPE_STRUCT, %eax
 	je	.Lcls_retstruct
 .Lcls_epilogue:
@@ -236,6 +252,12 @@ ffi_closure_SYSV:
 	movl	(%ecx), %eax
 	movl	4(%ecx), %edx
 	jmp	.Lcls_epilogue
+.Lcls_retstruct1b:
+	movsbl	(%ecx), %eax
+	jmp	.Lcls_epilogue
+.Lcls_retstruct2b:
+	movswl	(%ecx), %eax
+	jmp	.Lcls_epilogue
 .Lcls_retstruct:
 	movl	%ebp, %esp
 	popl	%ebp
@@ -245,20 +267,9 @@ ffi_closure_SYSV:
 
 #if !FFI_NO_RAW_API
 
-/* Precalculate for e.g. the Solaris 10/x86 assembler.  */
-#if FFI_TRAMPOLINE_SIZE == 10
-#define RAW_CLOSURE_CIF_OFFSET 12
-#define RAW_CLOSURE_FUN_OFFSET 16
-#define RAW_CLOSURE_USER_DATA_OFFSET 20
-#elif FFI_TRAMPOLINE_SIZE == 24
-#define RAW_CLOSURE_CIF_OFFSET 24
-#define RAW_CLOSURE_FUN_OFFSET 28
-#define RAW_CLOSURE_USER_DATA_OFFSET 32
-#else
 #define RAW_CLOSURE_CIF_OFFSET ((FFI_TRAMPOLINE_SIZE + 3) & ~3)
 #define RAW_CLOSURE_FUN_OFFSET (RAW_CLOSURE_CIF_OFFSET + 4)
 #define RAW_CLOSURE_USER_DATA_OFFSET (RAW_CLOSURE_FUN_OFFSET + 4)
-#endif
 #define CIF_FLAGS_OFFSET 20
 
 	.align	4
@@ -328,52 +339,23 @@ ffi_closure_raw_SYSV:
 	.size	ffi_closure_raw_SYSV, .-ffi_closure_raw_SYSV
 #endif
 
-#if defined __PIC__
-# if defined __sun__ && defined __svr4__
-/* 32-bit Solaris 2/x86 uses datarel encoding for PIC.  GNU ld before 2.22
-   doesn't correctly sort .eh_frame_hdr with mixed encodings, so match this.  */
-#  define FDE_ENCODING		0x30	/* datarel */
-#  define FDE_ENCODE(X)		X@GOTOFF
-# else
-#  define FDE_ENCODING		0x1b	/* pcrel sdata4 */
-#  if defined HAVE_AS_X86_PCREL
-#   define FDE_ENCODE(X)	X-.
-#  else
-#   define FDE_ENCODE(X)	X@rel
-#  endif
-# endif
-#else
-# define FDE_ENCODING		0	/* absolute */
-# define FDE_ENCODE(X)		X
-#endif
-
 	.section	.eh_frame,EH_FRAME_FLAGS,@progbits
 .Lframe1:
 	.long	.LECIE1-.LSCIE1	/* Length of Common Information Entry */
 .LSCIE1:
 	.long	0x0	/* CIE Identifier Tag */
 	.byte	0x1	/* CIE Version */
-#ifdef HAVE_AS_ASCII_PSEUDO_OP
 #ifdef __PIC__
 	.ascii "zR\0"	/* CIE Augmentation */
 #else
 	.ascii "\0"	/* CIE Augmentation */
-#endif
-#elif defined HAVE_AS_STRING_PSEUDO_OP
-#ifdef __PIC__
-	.string "zR"	/* CIE Augmentation */
-#else
-	.string ""	/* CIE Augmentation */
-#endif
-#else
-#error missing .ascii/.string
 #endif
 	.byte	0x1	/* .uleb128 0x1; CIE Code Alignment Factor */
 	.byte	0x7c	/* .sleb128 -4; CIE Data Alignment Factor */
 	.byte	0x8	/* CIE RA Column */
 #ifdef __PIC__
 	.byte	0x1	/* .uleb128 0x1; Augmentation size */
-	.byte	FDE_ENCODING
+	.byte	0x1b	/* FDE Encoding (pcrel sdata4) */
 #endif
 	.byte	0xc	/* DW_CFA_def_cfa */
 	.byte	0x4	/* .uleb128 0x4 */
@@ -386,8 +368,12 @@ ffi_closure_raw_SYSV:
 	.long	.LEFDE1-.LASFDE1	/* FDE Length */
 .LASFDE1:
 	.long	.LASFDE1-.Lframe1	/* FDE CIE offset */
-	.long	FDE_ENCODE(.LFB1)	/* FDE initial location */
-	.long	.LFE1-.LFB1		/* FDE address range */
+#ifdef __PIC__
+	.long	.LFB1-.	/* FDE initial location */
+#else
+	.long	.LFB1	/* FDE initial location */
+#endif
+	.long	.LFE1-.LFB1	/* FDE address range */
 #ifdef __PIC__
 	.byte	0x0	/* .uleb128 0x0; Augmentation size */
 #endif
@@ -407,8 +393,12 @@ ffi_closure_raw_SYSV:
 	.long	.LEFDE2-.LASFDE2	/* FDE Length */
 .LASFDE2:
 	.long	.LASFDE2-.Lframe1	/* FDE CIE offset */
-	.long	FDE_ENCODE(.LFB2)	/* FDE initial location */
-	.long	.LFE2-.LFB2		/* FDE address range */
+#ifdef __PIC__
+	.long	.LFB2-.	/* FDE initial location */
+#else
+	.long	.LFB2
+#endif
+	.long	.LFE2-.LFB2	/* FDE address range */
 #ifdef __PIC__
 	.byte	0x0	/* .uleb128 0x0; Augmentation size */
 #endif
@@ -437,8 +427,12 @@ ffi_closure_raw_SYSV:
 	.long	.LEFDE3-.LASFDE3	/* FDE Length */
 .LASFDE3:
 	.long	.LASFDE3-.Lframe1	/* FDE CIE offset */
-	.long	FDE_ENCODE(.LFB3)	/* FDE initial location */
-	.long	.LFE3-.LFB3		/* FDE address range */
+#ifdef __PIC__
+	.long	.LFB3-.	/* FDE initial location */
+#else
+	.long	.LFB3
+#endif
+	.long	.LFE3-.LFB3	/* FDE address range */
 #ifdef __PIC__
 	.byte	0x0	/* .uleb128 0x0; Augmentation size */
 #endif
@@ -462,7 +456,3 @@ ffi_closure_raw_SYSV:
 #endif
 
 #endif /* ifndef __x86_64__ */
-
-#if defined __ELF__ && defined __linux__
-	.section	.note.GNU-stack,"",@progbits
-#endif
