@@ -1,0 +1,15 @@
+src/aarch64/sysv.lo: src/aarch64/sysv.S /usr/include/stdc-predef.h \
+ fficonfig.h include/ffi.h include/ffitarget.h include/ffi_cfi.h \
+ src/aarch64/internal.h
+
+/usr/include/stdc-predef.h:
+
+fficonfig.h:
+
+include/ffi.h:
+
+include/ffitarget.h:
+
+include/ffi_cfi.h:
+
+src/aarch64/internal.h:
