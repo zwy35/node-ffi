@@ -1,0 +1,11 @@
+#IDE Support
+.idea
+#Project
+build
+Release
+Debug
+node_modules
+Makefile.gyp
+gyp-*-tool
+.dirstamp
+npm-debug.log
