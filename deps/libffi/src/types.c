@@ -45,6 +45,7 @@ maybe_const ffi_type ffi_type_##name = {	\
   id, NULL					\
 }
 
+#if (__aarch64__)
 #define FFI_COMPLEX_TYPEDEF(name, type, maybe_const)	\
 static ffi_type *ffi_elements_complex_##name [2] = {	\
 	(ffi_type *)(&ffi_type_##name), NULL		\
@@ -60,7 +61,9 @@ maybe_const ffi_type ffi_type_complex_##name = {	\
   FFI_TYPE_COMPLEX,					\
   (ffi_type **)ffi_elements_complex_##name		\
 }
+#else
 
+#endif
 /* Size and alignment are fake here. They must not be 0. */
 FFI_EXTERN const ffi_type ffi_type_void = {
   1, 1, FFI_TYPE_VOID, NULL
@@ -99,10 +102,12 @@ const ffi_type ffi_type_longdouble = { 16, 16, 4, NULL };
 FFI_TYPEDEF(longdouble, long double, FFI_TYPE_LONGDOUBLE, FFI_LDBL_CONST);
 #endif
 
+#if (__aarch64__)
 #ifdef FFI_TARGET_HAS_COMPLEX_TYPE
 FFI_COMPLEX_TYPEDEF(float, float, const);
 FFI_COMPLEX_TYPEDEF(double, double, const);
 #if FFI_TYPE_LONGDOUBLE != FFI_TYPE_DOUBLE
 FFI_COMPLEX_TYPEDEF(longdouble, long double, FFI_LDBL_CONST);
+#endif
 #endif
 #endif
