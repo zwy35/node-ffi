@@ -116,11 +116,18 @@
         ],
       },
       'conditions': [
-        ['target_arch=="arm64"', {
-          'sources': [ 'src/aarch64/ffi.c' ],
+        ['target_arch=="arm"', {
+          'sources': [ 'src/arm/ffi.c' ],
           'conditions': [
             ['OS=="linux"', {
-              'sources': [ 'src/aarch64/sysv.S' ]
+              'sources': [ 'src/arm/sysv.S' ]
+            }]
+          ]
+        }, 'target_arch=="arm64"', {
+          'sources': [ 'src/arm64/ffi.c' ],
+          'conditions': [
+            ['OS=="linux"', {
+              'sources': [ 'src/arm64/sysv.S' ]
             }]
           ]
         }, { # ia32 or x64

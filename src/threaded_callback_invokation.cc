@@ -1,7 +1,8 @@
-#include <node.h>
 #include "ffi.h"
 
-ThreadedCallbackInvokation::ThreadedCallbackInvokation(callback_info *cbinfo, void *retval, void **parameters) {
+namespace FFI {
+
+ThreadedCallbackInvokation::ThreadedCallbackInvokation(callback_info* cbinfo, void* retval, void** parameters) {
   m_cbinfo = cbinfo;
   m_retval = retval;
   m_parameters = parameters;
@@ -25,4 +26,6 @@ void ThreadedCallbackInvokation::SignalDoneExecuting() {
 
 void ThreadedCallbackInvokation::WaitForExecution() {
   uv_cond_wait(&m_cond, &m_mutex);
+}
+
 }
